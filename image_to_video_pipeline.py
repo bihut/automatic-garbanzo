@@ -2,7 +2,7 @@ import json
 import time
 import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import torch
 from diffusers import CogVideoXImageToVideoPipeline
@@ -14,7 +14,7 @@ def load_config(path: str) -> Dict[str, Any]:
         return json.load(f)
 
 
-def create_timestamped_output(base_dir: Path, run_name: str | None = None) -> Path:
+def create_timestamped_output(base_dir: Path, run_name: Optional[str] = None) -> Path:
     base_dir.mkdir(parents=True, exist_ok=True)
     ts = time.strftime("%Y%m%d-%H%M%S")
     if run_name:
