@@ -1,5 +1,6 @@
 import json
 import time
+import sys
 from pathlib import Path
 from typing import Dict, Any
 
@@ -24,7 +25,7 @@ def create_timestamped_output(base_dir: Path, run_name: str | None = None) -> Pa
     return run_dir
 
 
-def main(config_path: str = "pipelines/nina_alegre_demo_v1.json") -> None:
+def main(config_path: str = "pipelines/pipeline1/nina_alegre_demo_v1.json") -> None:
     cfg = load_config(config_path)
 
     character = cfg["character"]
@@ -114,5 +115,11 @@ def main(config_path: str = "pipelines/nina_alegre_demo_v1.json") -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # Permite llamar:
+    #   python image_to_video_pipeline.py
+    #   python image_to_video_pipeline.py pipelines/otro_pipeline.json
+    if len(sys.argv) > 1:
+        main(sys.argv[1])
+    else:
+        main()
 
