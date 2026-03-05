@@ -1,0 +1,46 @@
+{
+  "id": "personajes_jugando_1",
+  "evaluation": 0,
+  "run_name": "personajes_jugando_1",
+  "character": {
+    "name": "personajes",
+    "image_path": "pipelines/pipeline1/pipeline1.png",
+    "seed": 1234
+  },
+  "model": {
+    "type": "cogvideox_i2v",
+    "pretrained_name": "THUDM/CogVideoX-5b-I2V",
+    "num_frames": 16,
+    "fps": 8,
+    "height": 576,
+    "width": 1024,
+    "guidance_scale": 6.5,
+    "num_inference_steps": 30
+  },
+  "clips": [
+    {
+      "name": "jugando_patio",
+      "prompt": "Pichuelo está jugando con la pelota, Yuppy, el perrito, juega con su pelota y Princesita juega con su muñea",
+      "negative_prompt": "realistic, photorealistic, low quality, text, watermark"
+    },
+    {
+      "name": "mama_los_llama",
+      "prompt": "mientras están jugando, la mamá los llama para que vayan a merendar. Pichuelo deja el coche, Yuppy la pelota y Princesita la muñeca, y corren por el jardín dirección a su madre.",
+      "negative_prompt": "realistic, photorealistic, low quality, text, watermark"
+    },
+    {
+      "name": "pichuelo_cae",
+      "prompt": "mientras están corriendo, Pichuelo se cae al suelo y lastima la pierna. Yuppy, el perro, y princesita, la niña, observan preocupados.",
+      "negative_prompt": "realistic, photorealistic, low quality, text, watermark"
+    }
+    ,
+    {
+      "name": "carinio",
+      "prompt": "a pesar de que pichuelo está lastimado, Yuppy y princesita le dan besitos y Pichuelo se levanta y sonríe.",
+      "negative_prompt": "realistic, photorealistic, low quality, text, watermark"
+    }
+  ],
+  "output": {
+    "base_dir": "outputs/pipeline1"
+  }
+}

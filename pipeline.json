@@ -1,0 +1,33 @@
+{
+  "run_name": "nina_alegre_demo",
+  "character": {
+    "name": "nina_alegre",
+    "image_path": "assets/nina_alegre.png",
+    "seed": 1234
+  },
+  "model": {
+    "type": "cogvideox_i2v",
+    "pretrained_name": "THUDM/CogVideoX-5b-I2V",
+    "num_frames": 16,
+    "fps": 8,
+    "height": 576,
+    "width": 1024,
+    "guidance_scale": 6.5,
+    "num_inference_steps": 30
+  },
+  "clips": [
+    {
+      "name": "bailando_parque",
+      "prompt": "ilustración infantil de una niña pequeña llamada Nina Alegre bailando feliz en un parque soleado, estilo dibujo animado, colores vivos, fondo sencillo",
+      "negative_prompt": "realistic, photorealistic, low quality, text, watermark"
+    },
+    {
+      "name": "saltando_charcos",
+      "prompt": "ilustración infantil de Nina Alegre saltando en charcos después de la lluvia, muchas gotas de agua, estilo cartoon, muy expresiva, fondo sencillo",
+      "negative_prompt": "realistic, photorealistic, low quality, text, watermark"
+    }
+  ],
+  "output": {
+    "base_dir": "outputs"
+  }
+}
