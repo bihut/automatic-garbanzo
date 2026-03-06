@@ -14,3 +14,4 @@ compel==2.0.3
 numpy
 pillow
 requests
+sentencepiece

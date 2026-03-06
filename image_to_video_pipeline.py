@@ -67,10 +67,13 @@ def main(config_path: str = "pipelines/pipeline1/nina_alegre_demo_v1.json") -> N
     pretrained_name = model_cfg["pretrained_name"]
     num_frames = model_cfg.get("num_frames", 16)
     fps = model_cfg.get("fps", 8)
-    height = model_cfg.get("height", 576)
-    width = model_cfg.get("width", 1024)
     guidance_scale = model_cfg.get("guidance_scale", 6.5)
     num_inference_steps = model_cfg.get("num_inference_steps", 30)
+    # CogVideoX-5b-I2V solo permite su resolución por defecto (720x480); no pasar height/width
+    use_default_resolution = "CogVideoX-5b-I2V" in pretrained_name
+    if not use_default_resolution:
+        height = model_cfg.get("height", 576)
+        width = model_cfg.get("width", 1024)
 
     print(f"Cargando pipeline CogVideoXImageToVideo: {pretrained_name}")
     pipe = CogVideoXImageToVideoPipeline.from_pretrained(
@@ -93,7 +96,7 @@ def main(config_path: str = "pipelines/pipeline1/nina_alegre_demo_v1.json") -> N
 
         print(f"Generando clip '{name}'...")
 
-        video = pipe(
+        kwargs = dict(
             prompt=prompt,
             image=base_image,
             negative_prompt=negative_prompt,
@@ -101,9 +104,11 @@ def main(config_path: str = "pipelines/pipeline1/nina_alegre_demo_v1.json") -> N
             guidance_scale=guidance_scale,
             num_inference_steps=num_inference_steps,
             generator=generator,
-            height=height,
-            width=width
         )
+        if not use_default_resolution:
+            kwargs["height"] = height
+            kwargs["width"] = width
+        video = pipe(**kwargs)
 
         frames = video.frames[0]  # lista de PIL Images
 
