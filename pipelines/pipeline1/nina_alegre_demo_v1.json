@@ -8,14 +8,15 @@
     "seed": 1234
   },
   "model": {
-    "type": "cogvideox_i2v",
-    "pretrained_name": "THUDM/CogVideoX-5b-I2V",
-    "num_frames": 16,
-    "fps": 8,
+    "type": "svd_img2vid",
+    "pretrained_name": "stabilityai/stable-video-diffusion-img2vid-xt",
+    "num_frames": 25,
+    "fps": 7,
     "height": 576,
     "width": 1024,
-    "guidance_scale": 6.5,
-    "num_inference_steps": 30
+    "decode_chunk_size": 4,
+    "motion_bucket_id": 127,
+    "noise_aug_strength": 0.02
   },
   "clips": [
     {

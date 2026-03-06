@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 import torch
-from diffusers import CogVideoXImageToVideoPipeline
+from diffusers import StableVideoDiffusionPipeline
 from diffusers.utils import load_image, export_to_video
 
 
@@ -57,58 +57,56 @@ def main(config_path: str = "pipelines/pipeline1/nina_alegre_demo_v1.json") -> N
     print(f"Cargando imagen base desde {image_path}")
     base_image = load_image(str(image_path))
 
-    # Configuración del modelo
-    if model_cfg.get("type") != "cogvideox_i2v":
+    # Configuración del modelo: Stable Video Diffusion (image-to-video)
+    model_type = model_cfg.get("type", "svd_img2vid")
+    if model_type != "svd_img2vid":
         raise ValueError(
-            f"Tipo de modelo no soportado: {model_cfg.get('type')}. "
-            "Actualmente sólo se ha implementado 'cogvideox_i2v'."
+            f"Tipo de modelo no soportado: {model_type}. "
+            "Actualmente sólo se ha implementado 'svd_img2vid' (Stable Video Diffusion)."
         )
 
     pretrained_name = model_cfg["pretrained_name"]
-    num_frames = model_cfg.get("num_frames", 16)
-    fps = model_cfg.get("fps", 8)
-    guidance_scale = model_cfg.get("guidance_scale", 6.5)
-    num_inference_steps = model_cfg.get("num_inference_steps", 30)
-    # CogVideoX-5b-I2V solo permite su resolución por defecto (720x480); no pasar height/width
-    use_default_resolution = "CogVideoX-5b-I2V" in pretrained_name
-    if not use_default_resolution:
-        height = model_cfg.get("height", 576)
-        width = model_cfg.get("width", 1024)
+    num_frames = model_cfg.get("num_frames", 25)
+    fps = model_cfg.get("fps", 7)
+    decode_chunk_size = model_cfg.get("decode_chunk_size", 4)
+    motion_bucket_id = model_cfg.get("motion_bucket_id", 127)
+    noise_aug_strength = model_cfg.get("noise_aug_strength", 0.02)
+    width = model_cfg.get("width", 1024)
+    height = model_cfg.get("height", 576)
 
-    print(f"Cargando pipeline CogVideoXImageToVideo: {pretrained_name}")
-    pipe = CogVideoXImageToVideoPipeline.from_pretrained(
+    print(f"Cargando pipeline StableVideoDiffusion: {pretrained_name}")
+    pipe = StableVideoDiffusionPipeline.from_pretrained(
         pretrained_name,
-        torch_dtype=dtype
+        torch_dtype=dtype,
+        variant="fp16",
     )
-    pipe.to(device)
 
-    # Opciones de memoria para GPUs grandes (3090 / V100)
+    # Opciones de memoria para GPUs (3090 / V100)
     if device == "cuda":
         pipe.enable_model_cpu_offload()
+        if hasattr(pipe.unet, "enable_forward_chunking"):
+            pipe.unet.enable_forward_chunking()
 
     seed = character.get("seed", 1234)
     generator = torch.Generator(device=device).manual_seed(seed)
 
     for clip in clips:
         name = clip["name"]
-        prompt = clip["prompt"]
-        negative_prompt = clip.get("negative_prompt")
+        prompt = clip.get("prompt", "")
+        print(f"Generando clip '{name}' (prompt usado solo como referencia de escena)...")
 
-        print(f"Generando clip '{name}'...")
+        # SVD es puramente image-to-video: animamos la imagen base redimensionada
+        image_resized = base_image.resize((width, height))
 
-        kwargs = dict(
-            prompt=prompt,
-            image=base_image,
-            negative_prompt=negative_prompt,
+        video = pipe(
+            image=image_resized,
             num_frames=num_frames,
-            guidance_scale=guidance_scale,
-            num_inference_steps=num_inference_steps,
+            decode_chunk_size=decode_chunk_size,
             generator=generator,
+            fps=fps,
+            motion_bucket_id=motion_bucket_id,
+            noise_aug_strength=noise_aug_strength,
         )
-        if not use_default_resolution:
-            kwargs["height"] = height
-            kwargs["width"] = width
-        video = pipe(**kwargs)
 
         frames = video.frames[0]  # lista de PIL Images
 
