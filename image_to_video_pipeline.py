@@ -1,12 +1,13 @@
+import base64
 import json
-import time
+import mimetypes
+import os
 import sys
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-import torch
-from diffusers import StableVideoDiffusionPipeline
-from diffusers.utils import load_image, export_to_video
+import requests
 
 
 def load_config(path: str) -> Dict[str, Any]:
@@ -23,6 +24,118 @@ def create_timestamped_output(base_dir: Path, run_name: Optional[str] = None) ->
         run_dir = base_dir / ts
     (run_dir / "clips").mkdir(parents=True, exist_ok=True)
     return run_dir
+
+
+def prepare_image_payload(image_path: str) -> str:
+    """Devuelve una cadena para image_url: si es URL http, se usa tal cual;
+    si es ruta local, se convierte a data URL base64."""
+    if image_path.startswith("http://") or image_path.startswith("https://"):
+        return image_path
+
+    path = Path(image_path)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"No se encontró la imagen del personaje en '{path}'. "
+            "Coloca ahí la imagen generada por Gemini o ajusta 'image_path' en el fichero de pipeline."
+        )
+
+    mime_type, _ = mimetypes.guess_type(path.name)
+    if mime_type is None:
+        mime_type = "image/png"
+
+    with open(path, "rb") as f:
+        data = f.read()
+
+    b64 = base64.b64encode(data).decode("utf-8")
+    return f"data:{mime_type};base64,{b64}"
+
+
+def get_api_key(model_cfg: Dict[str, Any]) -> str:
+    env_name = model_cfg.get("api_key_env", "AIMLAPI_API_KEY")
+    api_key = os.getenv(env_name)
+    if not api_key:
+        raise RuntimeError(
+            f"No se encontró la API key. Define la variable de entorno '{env_name}' "
+            "con tu clave de AIMLAPI (Hailuo)."
+        )
+    return api_key
+
+
+def hailuo_create_task(
+    api_key: str,
+    base_url: str,
+    model_name: str,
+    prompt: str,
+    image_url: str,
+    duration: int,
+    resolution: str,
+    enhance_prompt: bool,
+) -> Dict[str, Any]:
+    url = f"{base_url}/video/generations"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    payload: Dict[str, Any] = {
+        "model": model_name,
+        "prompt": prompt,
+        "image_url": image_url,
+        "duration": duration,
+        "resolution": resolution,
+        "enhance_prompt": enhance_prompt,
+    }
+    resp = requests.post(url, json=payload, headers=headers, timeout=60)
+    if resp.status_code >= 400:
+        raise RuntimeError(f"Error Hailuo create_task {resp.status_code}: {resp.text}")
+    return resp.json()
+
+
+def hailuo_poll_task(
+    api_key: str,
+    base_url: str,
+    generation_id: str,
+    poll_interval: int,
+    timeout_seconds: int,
+) -> Dict[str, Any]:
+    url = f"{base_url}/video/generations"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    start = time.time()
+
+    while True:
+        if time.time() - start > timeout_seconds:
+            raise TimeoutError(
+                f"Timeout al esperar el vídeo de Hailuo (id={generation_id})."
+            )
+
+        resp = requests.get(
+            url, params={"generation_id": generation_id}, headers=headers, timeout=60
+        )
+        if resp.status_code >= 400:
+            raise RuntimeError(f"Error Hailuo poll_task {resp.status_code}: {resp.text}")
+
+        data = resp.json()
+        status = data.get("status")
+        print(f"Estado de la tarea {generation_id}: {status}")
+
+        if status in ("queued", "waiting", "generating"):
+            time.sleep(poll_interval)
+            continue
+
+        if status == "completed":
+            return data
+
+        # status == "error" u otros
+        raise RuntimeError(f"Tarea Hailuo en estado de error: {data}")
+
+
+def download_video(url: str, dest_path: Path) -> None:
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    with requests.get(url, stream=True, timeout=300) as r:
+        r.raise_for_status()
+        with open(dest_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
 
 
 def main(config_path: str = "pipelines/pipeline1/nina_alegre_demo_v1.json") -> None:
@@ -43,75 +156,64 @@ def main(config_path: str = "pipelines/pipeline1/nina_alegre_demo_v1.json") -> N
     print(f"ID del pipeline: {pipeline_id} | Evaluación: {evaluation}")
     print(f"Directorio de salida de esta ejecución: {run_dir}")
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.float16 if device == "cuda" else torch.float32
-    print(f"Usando dispositivo: {device}, dtype: {dtype}")
-
-    # Cargar imagen base del personaje
-    image_path = Path(character["image_path"])
-    if not image_path.exists():
-        raise FileNotFoundError(
-            f"No se encontró la imagen del personaje en '{image_path}'. "
-            "Coloca ahí la imagen generada por Gemini (o ajusta 'image_path' en el fichero de pipeline)."
-        )
-    print(f"Cargando imagen base desde {image_path}")
-    base_image = load_image(str(image_path))
-
-    # Configuración del modelo: Stable Video Diffusion (image-to-video)
-    model_type = model_cfg.get("type", "svd_img2vid")
-    if model_type != "svd_img2vid":
+    # Configuración del modelo Hailuo (via AIMLAPI)
+    model_type = model_cfg.get("type", "hailuo_i2v")
+    if model_type != "hailuo_i2v":
         raise ValueError(
             f"Tipo de modelo no soportado: {model_type}. "
-            "Actualmente sólo se ha implementado 'svd_img2vid' (Stable Video Diffusion)."
+            "Actualmente sólo se ha implementado 'hailuo_i2v' (Hailuo 2.3 vía AIMLAPI)."
         )
 
-    pretrained_name = model_cfg["pretrained_name"]
-    num_frames = model_cfg.get("num_frames", 25)
-    fps = model_cfg.get("fps", 7)
-    decode_chunk_size = model_cfg.get("decode_chunk_size", 4)
-    motion_bucket_id = model_cfg.get("motion_bucket_id", 127)
-    noise_aug_strength = model_cfg.get("noise_aug_strength", 0.02)
-    width = model_cfg.get("width", 1024)
-    height = model_cfg.get("height", 576)
+    api_key = get_api_key(model_cfg)
+    base_url = model_cfg.get("base_url", "https://api.aimlapi.com/v2")
+    hailuo_model = model_cfg.get("hailuo_model", "minimax/hailuo-2.3")
+    duration = int(model_cfg.get("duration", 6))
+    resolution = model_cfg.get("resolution", "768P")
+    enhance_prompt = bool(model_cfg.get("enhance_prompt", True))
+    poll_interval = int(model_cfg.get("poll_interval", 15))
+    timeout_seconds = int(model_cfg.get("timeout_seconds", 900))
 
-    print(f"Cargando pipeline StableVideoDiffusion: {pretrained_name}")
-    pipe = StableVideoDiffusionPipeline.from_pretrained(
-        pretrained_name,
-        torch_dtype=dtype,
-        variant="fp16",
-    )
-
-    # Opciones de memoria para GPUs (3090 / V100)
-    if device == "cuda":
-        pipe.enable_model_cpu_offload()
-        if hasattr(pipe.unet, "enable_forward_chunking"):
-            pipe.unet.enable_forward_chunking()
-
-    seed = character.get("seed", 1234)
-    generator = torch.Generator(device=device).manual_seed(seed)
+    image_path = character["image_path"]
+    print(f"Preparando imagen base desde {image_path}")
+    image_url_payload = prepare_image_payload(image_path)
 
     for clip in clips:
         name = clip["name"]
         prompt = clip.get("prompt", "")
-        print(f"Generando clip '{name}' (prompt usado solo como referencia de escena)...")
 
-        # SVD es puramente image-to-video: animamos la imagen base redimensionada
-        image_resized = base_image.resize((width, height))
-
-        video = pipe(
-            image=image_resized,
-            num_frames=num_frames,
-            decode_chunk_size=decode_chunk_size,
-            generator=generator,
-            fps=fps,
-            motion_bucket_id=motion_bucket_id,
-            noise_aug_strength=noise_aug_strength,
+        print(f"Creando tarea de vídeo para clip '{name}' en Hailuo...")
+        task_resp = hailuo_create_task(
+            api_key=api_key,
+            base_url=base_url,
+            model_name=hailuo_model,
+            prompt=prompt,
+            image_url=image_url_payload,
+            duration=duration,
+            resolution=resolution,
+            enhance_prompt=enhance_prompt,
         )
 
-        frames = video.frames[0]  # lista de PIL Images
+        gen_id = task_resp.get("generation_id") or task_resp.get("id")
+        if not gen_id:
+            raise RuntimeError(f"No se recibió generation_id/id en la respuesta: {task_resp}")
+
+        print(f"Tarea creada con id: {gen_id}. Esperando resultado...")
+        result = hailuo_poll_task(
+            api_key=api_key,
+            base_url=base_url,
+            generation_id=gen_id,
+            poll_interval=poll_interval,
+            timeout_seconds=timeout_seconds,
+        )
+
+        video_info = result.get("video") or {}
+        video_url = video_info.get("url")
+        if not video_url:
+            raise RuntimeError(f"No se encontró URL de vídeo en la respuesta final: {result}")
 
         out_path = clips_dir / f"{name}.mp4"
-        export_to_video(frames, out_path, fps=fps)
+        print(f"Descargando vídeo de '{video_url}' a '{out_path}'")
+        download_video(video_url, out_path)
         print(f"Guardado clip: {out_path}")
 
     print("Todos los clips se han generado correctamente.")

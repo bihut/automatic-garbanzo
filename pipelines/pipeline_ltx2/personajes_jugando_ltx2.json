@@ -1,0 +1,62 @@
+{
+  "id": "personajes_jugando_ltx2_v1",
+  "evaluation": 0,
+  "run_name": "personajes_jugando_ltx2",
+  "character": {
+    "name": "personajes",
+    "image_path": "pipelines/pipeline1/pipeline1.png",
+    "seed": 1234
+  },
+  "model": {
+    "type": "ltx2_ti2vid_two_stages",
+    "checkpoint_path": "/home/angelr/proyectos/ls4lk/modelos/ltx-2.3-22b-distilled.safetensors",
+    "distilled_lora_path": "/home/angelr/proyectos/ls4lk/modelos/ltx-2.3-22b-distilled-lora-384.safetensors",
+    "distilled_lora_strength": 0.6,
+    "spatial_upsampler_path": "/home/angelr/proyectos/ls4lk/modelos/ltx-2.3-spatial-upscaler-x2-1.0.safetensors",
+    "gemma_root": "/home/angelr/proyectos/ls4lk/modelos/gemma-3",
+    "height": 512,
+    "width": 768,
+    "num_frames": 121,
+    "frame_rate": 25.0,
+    "num_inference_steps": 40,
+    "video_cfg_scale": 3.0,
+    "video_stg_scale": 1.0,
+    "video_rescale_scale": 0.7,
+    "video_modality_scale": 3.0,
+    "video_skip_step": 0,
+    "video_stg_blocks": [29],
+    "audio_cfg_scale": 7.0,
+    "audio_stg_scale": 1.0,
+    "audio_rescale_scale": 0.7,
+    "audio_modality_scale": 3.0,
+    "audio_skip_step": 0,
+    "audio_stg_blocks": [29],
+    "enhance_prompt": false
+  },
+  "clips": [
+    {
+      "name": "jugando_patio",
+      "prompt": "Pichuelo, un niño pequeño de dibujos animados con camiseta azul y pantalones cortos, juega alegremente con un balón rojo en un patio de césped verde. A su lado, Yuppy, un perrito marrón pequeño con orejas caídas, corre feliz con otra pelota. Princesita, una niña de dibujos animados con vestido rosa y corona pequeña, juega con su muñeca mientras los observa. La escena es luminosa, colores vivos, estilo ilustración infantil 2D, cámara fija ligeramente en plano general.",
+      "negative_prompt": "realistic, photorealistic, 3d, horror, grotesque, glitch, distorted, extra limbs, low quality, text, watermark"
+    },
+    {
+      "name": "mama_los_llama",
+      "prompt": "En el mismo patio infantil, la mamá llama a los niños desde la puerta de la casa, sonriendo y haciendo un gesto con la mano para que vayan a merendar. Pichuelo deja su coche de juguete, Yuppy deja la pelota y Princesita su muñeca, y todos empiezan a correr hacia la mamá por el césped. Estilo dibujo animado 2D, colores suaves y cálidos, cámara ligeramente en travelling hacia la puerta.",
+      "negative_prompt": "realistic, photorealistic, horror, glitch, distorted, extra limbs, low quality, text, watermark"
+    },
+    {
+      "name": "pichuelo_cae",
+      "prompt": "Mientras corren hacia la mamá, Pichuelo tropieza suavemente y cae al suelo, llevándose la mano a la rodilla con gesto de dolor leve. Yuppy se detiene a su lado moviendo la cola preocupado y Princesita se agacha mirándolo con cara de preocupación. Fondo de jardín sencillo, colores suaves, estilo serie infantil 2D, cámara en plano medio centrado en Pichuelo.",
+      "negative_prompt": "realistic, photorealistic, violencia fuerte, sangre, horror, glitch, distorted, low quality, text, watermark"
+    },
+    {
+      "name": "carinio",
+      "prompt": "Pichuelo sigue sentado en el césped con la rodilla un poco raspada, pero Yuppy le lame la cara con cariño y Princesita le da un abrazo y un beso en la mejilla. Pichuelo sonríe aliviado y se levanta despacio mientras la mamá los observa sonriendo desde el fondo. Estilo dibujo animado infantil, colores cálidos, ambiente tierno y alegre, cámara en plano medio cercano a los tres personajes.",
+      "negative_prompt": "realistic, photorealistic, horror, glitch, distorted, low quality, text, watermark"
+    }
+  ],
+  "output": {
+    "base_dir": "outputs/ltx2"
+  }
+}
+
